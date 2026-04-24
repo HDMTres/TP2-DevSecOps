@@ -138,3 +138,62 @@ J'ai implémenté le job `secrets-scan` avec les valeurs suivantes :
 - Le rapport JSON est uploadé dans les artefacts GitHub pour analyse.
 
 Implémentation : [devsecops.yml](.github/workflows/devsecops.yml#L16-L32)
+
+### Exercice 2.2 — Variante GitLab CI (réponse théorique)
+
+**Réponse (élève)**
+
+Si j'implémentais Gitleaks en GitLab CI, je compléterais les PLACEHOLDER ainsi :
+
+- **`GIT_DEPTH: 0`**  
+  → Équivalent de `fetch-depth: 0`, pour récupérer tout l'historique Git.
+
+- **`--source=.`**  
+  → Scanner le répertoire courant (racine du projet).
+
+- **`--config=.gitleaks.toml`**  
+  → Chemin vers la config Gitleaks.
+
+- **`--report-format=json`**  
+  → Format du rapport (json ou sarif selon besoin).
+
+- **`--report-path=gitleaks-report.json`**  
+  → Nom du fichier rapport à générer.
+
+- **`when: always`**  
+  → Uploader l'artefact même si le job échoue.
+
+- **`paths: - gitleaks-report.json`**  
+  → Fichier à sauvegarder en artefact.
+
+- **`expire_in: 30 days`**  
+  → Durée de rétention.
+
+⚠️ Dans mon projet, je n'implémente que GitHub Actions.
+
+---
+
+### Exercice 2.3 — Test du Security Gate
+
+**Test effectué (élève)**
+
+J'ai créé la branche test/secret-gate et ajouté un fichier test-secret.txt avec un faux secret AWS.
+Le push a été bloqué par GitHub Push Protection (détection côté serveur avant même que le code arrive dans le pipeline).
+
+**Question 7 : Quel est le message d'erreur exact affiché dans les logs quand un secret est détecté ?**
+
+Message GitHub Push Protection :
+"Push cannot contain secrets - Amazon AWS Access Key ID (commit: 48e979..., path: test-secret.txt:1) - Amazon AWS Secret Access Key (commit: 48e979..., path: test-secret.txt:2)"
+
+Le secret a été détecté AVANT même d'arriver dans le pipeline CI/CD (protection côté serveur GitHub).
+
+**Question 8 : Combien de secondes dure ce job ?**
+
+Le job Gitleaks dure environ 5-6 secondes (scan très rapide, d'où son placement en premier gate - fail fast).
+
+**Question 9 : Que se passe-t-il pour les jobs dépendants quand Gitleaks échoue ?**
+
+Quand le secret est détecté (ou bloqué par GitHub Push Protection), les jobs dépendants (dependency-scan, sast, container-scan, security-summary) sont automatiquement skipped/cancelled car ils ont needs: [secrets-scan].
+C'est le principe fail-fast : on économise du temps de CI en bloquant immédiatement.
+
+---
