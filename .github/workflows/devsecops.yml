@@ -158,3 +158,15 @@ jobs:
           echo "| 📦 SCA | ✅ Passed | Placeholder |" >> "$GITHUB_STEP_SUMMARY"
           echo "| 🔍 SAST | ✅ Passed | Placeholder |" >> "$GITHUB_STEP_SUMMARY"
           echo "| 🐳 Trivy | ✅ Passed | Placeholder |" >> "$GITHUB_STEP_SUMMARY"
+
+  test-secret-masking:
+    name: "🔐 Test Secret Masking"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test secret masking
+        env:
+          API_TOKEN: ${{ secrets.TEST_API_TOKEN }}
+        run: |
+          echo "Testing secret masking..."
+          echo "Token value: $API_TOKEN"
+          echo "Token length: ${#API_TOKEN}"
