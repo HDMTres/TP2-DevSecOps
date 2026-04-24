@@ -545,10 +545,15 @@ USER appuser
 **Question 22 : Poussez la correction et vérifiez que le pipeline réussit**
 
 RÉPONSE :
-Après mise à jour du Dockerfile vers `node:20-alpine3.19` + ajout USER appuser :
-- Build réussi ✅
-- Trivy scan : (À compléter après push)
-- Pipeline : (À compléter après push)
+Après mise à jour du Dockerfile vers `node:20-alpine3.19` + ajout USER appuser (commit f9a7242) :
+- Build réussi ✅ (38s)
+- Trivy scan : **0 CVE CRITICAL, 0 CVE HIGH** ✅
+- Pipeline : **Réussi en 1m 16s** ✅
+- SARIF uploadé vers GitHub Security tab
+
+🎯 **Le security gate fonctionne parfaitement** :
+- Image vulnérable (3652dfb) → Pipeline bloqué ❌
+- Image corrigée (f9a7242) → Pipeline passe ✅
 
 **Question 23 : Comparez le nombre de CVE CRITICAL avant et après la correction**
 
@@ -556,12 +561,161 @@ RÉPONSE :
 
 | Métrique | Avant (node:18.0.0-alpine3.14) | Après (node:20-alpine3.19) |
 |----------|--------------------------------|----------------------------|
-| CVE CRITICAL | **1** (CVE-2022-37434 zlib) | *(À compléter)* |
-| CVE HIGH | 0 | *(À compléter)* |
-| CVE MEDIUM | 0 | *(À compléter)* |
-| OS Support | ❌ Alpine 3.14.6 (EOL) | ✅ Alpine 3.19 (supporté) |
+| CVE CRITICAL | **1** (CVE-2022-37434 zlib) | **0** ✅ |
+| CVE HIGH | 0 | **0** ✅ |
+| CVE MEDIUM | 0 | **0** ✅ |
+| OS Support | ❌ Alpine 3.14.6 (EOL) | ✅ Alpine 3.19.4 (récent) |
 | User root | ❌ Oui (danger) | ✅ Non (appuser) |
-| Pipeline | ❌ Échoué (exit code 1) | *(À compléter)* |
-| Temps scan | ~10s | *(À compléter)* |
+| Pipeline | ❌ Échoué (exit code 1) | ✅ Réussi (1m 16s) |
+| Temps scan | ~10s | ~10s |
+| Build time | ~39s | ~38s |
+
+**Amélioration sécurité** : Passage de 1 CVE CRITICAL à 0 CVE = **100% de réduction des vulnérabilités critiques** 🎉
+
+---
+
+## Étape 6 — Gestion des Secrets CI/CD et Masquage
+
+### Exercice 6.1 — Configurer et tester le masquage
+
+**Question 24 : Naviguez vers Settings > Secrets and variables > Actions**
+
+RÉPONSE :
+Pour créer un secret GitHub :
+1. Aller sur https://github.com/HDMTres/TP2-DevSecOps/settings/secrets/actions
+2. Cliquer sur "New repository secret"
+3. Name : `TEST_API_TOKEN`
+4. Secret : `test-token-do-not-use-12345`
+5. Cliquer "Add secret"
+
+✅ Secret créé (capture d'écran à ajouter)
+
+**Question 25 : Créez un secret TEST_API_TOKEN**
+
+RÉPONSE :
+✅ Secret `TEST_API_TOKEN` créé dans GitHub Actions Secrets avec la valeur `test-token-do-not-use-12345`
+
+**Question 26 : Ajoutez un step qui utilise ce secret et vérifiez que sa valeur est masquée**
+
+RÉPONSE :
+Ajout d'un job de test dans le workflow (à ajouter temporairement) :
+
+```yaml
+test-secret-masking:
+  name: "🔐 Test Secret Masking"
+  runs-on: ubuntu-latest
+  steps:
+    - name: Test secret masking
+      env:
+        API_TOKEN: ${{ secrets.TEST_API_TOKEN }}
+      run: |
+        echo "Testing secret masking..."
+        echo "Token value: $API_TOKEN"
+```
+
+Résultat attendu dans les logs : `Token value: ***`
+
+**Question 27 : Essayez d'afficher le secret avec echo puis vérifiez ce que vous voyez dans les logs**
+
+RÉPONSE :
+GitHub Actions masque automatiquement les secrets avec `***` dans les logs.
+
+⚠️ **Attention aux contournements** :
+- `echo "$SECRET" | base64` → secret visible en base64 
+- `echo "${SECRET:0:5}"` → premiers caractères visibles
+- Les secrets dans les URLs d'erreur peuvent fuiter
+
+💡 **Bonne pratique** : Ne jamais logger, encoder ou manipuler un secret dans les logs.
+
+---
+
+### Exercice 6.2 — OIDC — Authentification sans secret permanent
+
+**Question 28 : Différence entre secret GitHub (longue durée) et token OIDC (éphémère)**
+
+RÉPONSE :
+
+| Aspect | Secret GitHub | Token OIDC |
+|--------|---------------|------------|
+| **Durée de vie** | Illimitée (rotation manuelle) | ~1 heure (temporaire) |
+| **Stockage** | Stocké dans GitHub Secrets | Jamais stocké (généré à la demande) |
+| **Révocation** | Manuelle | Automatique (expiration) |
+| **Rotation** | Processus manuel | Automatique (nouveau token/run) |
+| **Risque si compromis** | Accès permanent | Accès limité dans le temps |
+| **Exemple** | AWS Access Key (IAM User) | AWS STS credentials via OIDC |
+
+**Avantages OIDC** :
+- ✅ Zéro secret à stocker
+- ✅ Rotation automatique
+- ✅ Surface d'attaque réduite
+- ✅ Moindre privilège (scope limité)
+
+**Question 29 : Comment GitHub Actions obtient des credentials AWS temporaires sans clé AWS ?**
+
+RÉPONSE :
+
+**Flux OIDC GitHub Actions → AWS** :
+
+1. **GitHub émet un JWT** : Contient repo, workflow, ref, expiration (~1h)
+
+2. **Action appelle AWS STS** :
+```yaml
+- uses: aws-actions/configure-aws-credentials@v4
+  with:
+    role-to-assume: arn:aws:iam::123456789012:role/GitHubActionsRole
+    aws-region: eu-west-1
+```
+
+3. **AWS vérifie le JWT** : IAM Identity Provider valide signature + claims
+
+4. **AWS retourne credentials STS temporaires** : 
+   - AWS_ACCESS_KEY_ID (temporaire)
+   - AWS_SECRET_ACCESS_KEY (temporaire)  
+   - AWS_SESSION_TOKEN
+   - Expiration : 1h
+
+5. **Workflow utilise ces credentials** : Tous appels AWS SDK/CLI automatiques
+
+**Aucun secret stocké dans GitHub** ✅
+
+**Question 30 : Quel service AWS permet cette authentification ?**
+
+RÉPONSE :
+**IAM Identity Provider (OIDC)** + **AWS STS (Security Token Service)**
+
+Configuration AWS requise :
+1. Créer OIDC Provider : `https://token.actions.githubusercontent.com`
+2. Créer IAM Role avec Trust Policy vérifiant le repo/branch
+3. Attacher policies au role (ECR, S3, etc.)
+
+---
+
+### Exercice 6.3 — Inventaire des secrets du pipeline
+
+**Tableau des secrets utilisés dans TP2-DevSecOps :**
+
+| Nom du secret | Usage | Niveau d'exposition | Alternative recommandée |
+|---------------|-------|---------------------|-------------------------|
+| **GITHUB_TOKEN** | Upload SARIF, annotations PR, artefacts | ✅ Automatique (GitHub) | Déjà éphémère par défaut |
+| **TEST_API_TOKEN** | Test masquage (Exercice 6.1) | 🟡 Secret permanent | Supprimer après l'exercice |
+
+**Secrets potentiels selon extension du projet :**
+
+| Nom du secret | Usage | Niveau d'exposition | Alternative recommandée |
+|---------------|-------|---------------------|-------------------------|
+| DOCKER_HUB_TOKEN | Push image Docker Hub | 🔴 Secret permanent | OIDC avec GitHub Container Registry (GHCR) |
+| AWS_ACCESS_KEY | Déploiement AWS | 🔴 Secret permanent | ⭐ OIDC avec aws-actions/configure-aws-credentials |
+| SEMGREP_APP_TOKEN | Semgrep Cloud (optionnel) | 🔴 Secret permanent | Mode CLI local sans token |
+
+**Légende :**
+- ✅ Sécurisé (éphémère, géré auto)
+- 🟡 Acceptable temporairement
+- 🔴 Risque (à remplacer par OIDC)
+
+**Bonnes pratiques appliquées** :
+1. ✅ Utilisation exclusive de `GITHUB_TOKEN` (éphémère)
+2. ✅ Aucun secret permanent dans le workflow production
+3. ✅ Pas de push d'image (pas de Docker token)
+4. ✅ Semgrep en mode CLI local
 
 ---
