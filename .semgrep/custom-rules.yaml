@@ -5,3 +5,29 @@ rules:
     languages: [javascript, typescript]
     patterns:
       - pattern: $DB.query("..." + $X)
+
+  - id: hardcoded-admin-password
+    patterns:
+      - pattern-either:
+          - pattern: |
+              $VAR = "admin"
+          - pattern: |
+              $VAR = 'admin'
+      - metavariable-regex:
+          metavariable: $VAR
+          regex: .*(password|passwd|pwd|pass).*
+    message: Hardcoded admin password detected
+    languages: [javascript]
+    severity: ERROR
+    metadata:
+      category: security
+      owasp: A07:2021 - Identification and Authentication Failures
+
+  - id: dangerous-eval-usage
+    pattern: eval($INPUT)
+    message: Dangerous use of eval() with user input
+    languages: [javascript]
+    severity: ERROR
+    metadata:
+      category: security
+      owasp: A03:2021 - Injection

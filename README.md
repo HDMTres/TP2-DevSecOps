@@ -352,24 +352,64 @@ Si j'implémentais Semgrep en GitLab CI :
 **Question 16 : Combien de findings Semgrep votre pipeline a-t-il détectés ? Avec quelle sévérité ?**
 
 RÉPONSE :
-(À compléter après exécution du pipeline)
+**0 findings détectés** (commit 331ec43, job SAST réussi en 7 secondes)
+
+Détails du scan :
+- 203 règles exécutées (Community + Custom)
+- 11 fichiers scannés (limité aux fichiers trackés par git)
+- 2 fichiers ignorés via .semgrepignore (node_modules/, Dockerfile)
+- 1 fichier >1MB skippé
+
+Pourquoi 0 findings malgré app.js vulnérable ?
+→ Les règles custom (`.semgrep/custom-rules.yaml`) utilisent des patterns trop spécifiques qui ne matchent pas le code réel. Par exemple :
+- Règle `password = "admin"` ne matche pas `const adminPassword = "admin";`
+- Les packs p/owasp-top-ten et p/secrets n'ont pas détecté les vulnérabilités dans ce code minimal.
 
 **Question 17 : Les annotations apparaissent-elles sur les lignes de code dans la PR ? Montrez une capture.**
 
 RÉPONSE :
-(À compléter avec capture d'écran des annotations)
+Pas d'annotations car 0 findings détectés. Pour tester les annotations Semgrep :
+1. Améliorer les règles custom pour détecter réellement les vulnérabilités
+2. Créer une Pull Request avec du code vulnérable
+3. Les findings apparaîtraient alors comme annotations sur les lignes concernées via l'onglet Security > Code scanning alerts
+
+Le SARIF a bien été uploadé vers GitHub Security tab (catégorie: semgrep-sast).
 
 **Question 18 : Identifiez au moins 1 faux positif. Comment écrire une règle d'exclusion (noqa comment ou .semgrepignore) ?**
 
 RÉPONSE :
-Pour exclure un faux positif :
-- Ajouter un commentaire `# nosemgrep: rule-id` sur la ligne concernée
-- Ou créer un fichier `.semgrepignore` avec les chemins/patterns à ignorer (syntaxe .gitignore)
+Aucun faux positif détecté (0 findings). Mais voici comment gérer les faux positifs :
+
+**Méthode 1 - Commentaire inline** :
+```javascript
+const password = "admin"; // nosemgrep: hardcoded-admin-password
+```
+
+**Méthode 2 - .semgrepignore** (déjà créé) :
+```
+node_modules/
+.git/
+Dockerfile
+package*.json
+```
+Syntaxe identique à .gitignore (patterns glob).
+
+**Méthode 3 - Configuration dans la règle** :
+Ajouter `paths.exclude` dans la règle YAML pour ignorer certains chemins.
 
 **Question 19 : Comparez le temps d'exécution Semgrep vs OWASP Dep-Check. Lequel est plus rapide ? Pourquoi ?**
 
 RÉPONSE :
-Semgrep est beaucoup plus rapide (~5-10s) que OWASP Dependency-Check (~40s-15min).
-Raison : Semgrep analyse le code source localement avec des patterns regex/AST, tandis que Dep-Check doit télécharger et interroger des bases de données externes (NVD).
+**Semgrep : 7 secondes** (commit 331ec43)  
+**OWASP Dependency-Check : 40 secondes** (commit 7b0cd2e, sans cache)
+
+**Semgrep est 5-6× plus rapide.**
+
+Raisons :
+1. **Semgrep** : Analyse syntaxique locale (AST pattern matching) sur le code source, pas de réseau requis
+2. **OWASP Dep-Check** : Doit télécharger et interroger des bases NVD externes, parser les manifests (package.json, pom.xml), calculer les hashes
+
+→ Semgrep = SAST statique rapide  
+→ Dependency-Check = SCA avec dépendances réseau (BD de vulnérabilités)
 
 ---
