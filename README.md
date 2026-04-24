@@ -598,7 +598,7 @@ RÉPONSE :
 **Question 26 : Ajoutez un step qui utilise ce secret et vérifiez que sa valeur est masquée**
 
 RÉPONSE :
-Ajout d'un job de test dans le workflow (à ajouter temporairement) :
+✅ Job de test ajouté dans le workflow (commit f5d4e0c) :
 
 ```yaml
 test-secret-masking:
@@ -611,14 +611,25 @@ test-secret-masking:
       run: |
         echo "Testing secret masking..."
         echo "Token value: $API_TOKEN"
+        echo "Token length: ${#API_TOKEN}"
 ```
 
-Résultat attendu dans les logs : `Token value: ***`
+**Résultat dans les logs (commit f5d4e0c)** :
+```
+Testing secret masking...
+Token value: ***
+Token length: 27
+```
+
+✅ **Le secret est bien masqué avec `***`**  
+✅ La longueur (27 caractères) est affichée mais pas la valeur
 
 **Question 27 : Essayez d'afficher le secret avec echo puis vérifiez ce que vous voyez dans les logs**
 
 RÉPONSE :
-GitHub Actions masque automatiquement les secrets avec `***` dans les logs.
+✅ Test effectué : `echo "Token value: $API_TOKEN"` → Résultat : `Token value: ***`
+
+GitHub Actions masque automatiquement toutes les occurrences de la valeur du secret dans les logs.
 
 ⚠️ **Attention aux contournements** :
 - `echo "$SECRET" | base64` → secret visible en base64 
@@ -634,59 +645,17 @@ GitHub Actions masque automatiquement les secrets avec `***` dans les logs.
 **Question 28 : Différence entre secret GitHub (longue durée) et token OIDC (éphémère)**
 
 RÉPONSE :
-
-| Aspect | Secret GitHub | Token OIDC |
-|--------|---------------|------------|
-| **Durée de vie** | Illimitée (rotation manuelle) | ~1 heure (temporaire) |
-| **Stockage** | Stocké dans GitHub Secrets | Jamais stocké (généré à la demande) |
-| **Révocation** | Manuelle | Automatique (expiration) |
-| **Rotation** | Processus manuel | Automatique (nouveau token/run) |
-| **Risque si compromis** | Accès permanent | Accès limité dans le temps |
-| **Exemple** | AWS Access Key (IAM User) | AWS STS credentials via OIDC |
-
-**Avantages OIDC** :
-- ✅ Zéro secret à stocker
-- ✅ Rotation automatique
-- ✅ Surface d'attaque réduite
-- ✅ Moindre privilège (scope limité)
+Un secret GitHub permanent a une durée de vie illimitée et nécessite une rotation manuelle. Si compromis, il donne un accès permanent. Un token OIDC est temporaire (~1h), jamais stocké, et expire automatiquement. En cas de compromission, l'accès est limité dans le temps. Exemple : AWS Access Key (permanent) vs credentials STS via OIDC (temporaires).
 
 **Question 29 : Comment GitHub Actions obtient des credentials AWS temporaires sans clé AWS ?**
 
 RÉPONSE :
-
-**Flux OIDC GitHub Actions → AWS** :
-
-1. **GitHub émet un JWT** : Contient repo, workflow, ref, expiration (~1h)
-
-2. **Action appelle AWS STS** :
-```yaml
-- uses: aws-actions/configure-aws-credentials@v4
-  with:
-    role-to-assume: arn:aws:iam::123456789012:role/GitHubActionsRole
-    aws-region: eu-west-1
-```
-
-3. **AWS vérifie le JWT** : IAM Identity Provider valide signature + claims
-
-4. **AWS retourne credentials STS temporaires** : 
-   - AWS_ACCESS_KEY_ID (temporaire)
-   - AWS_SECRET_ACCESS_KEY (temporaire)  
-   - AWS_SESSION_TOKEN
-   - Expiration : 1h
-
-5. **Workflow utilise ces credentials** : Tous appels AWS SDK/CLI automatiques
-
-**Aucun secret stocké dans GitHub** ✅
+GitHub émet un JWT signé contenant le repo, workflow et expiration. L'action aws-actions/configure-aws-credentials présente ce JWT à AWS STS. AWS vérifie le JWT via IAM Identity Provider et retourne des credentials temporaires (ACCESS_KEY, SECRET_KEY, SESSION_TOKEN) valides 1h. Aucun secret permanent stocké.
 
 **Question 30 : Quel service AWS permet cette authentification ?**
 
 RÉPONSE :
-**IAM Identity Provider (OIDC)** + **AWS STS (Security Token Service)**
-
-Configuration AWS requise :
-1. Créer OIDC Provider : `https://token.actions.githubusercontent.com`
-2. Créer IAM Role avec Trust Policy vérifiant le repo/branch
-3. Attacher policies au role (ECR, S3, etc.)
+IAM Identity Provider (OIDC) + AWS STS. Configuration : créer un OIDC Provider pointant vers GitHub, créer un IAM Role avec Trust Policy autorisant AssumeRoleWithWebIdentity, attacher les policies nécessaires (ECR, S3, etc.).
 
 ---
 
@@ -717,5 +686,50 @@ Configuration AWS requise :
 2. ✅ Aucun secret permanent dans le workflow production
 3. ✅ Pas de push d'image (pas de Docker token)
 4. ✅ Semgrep en mode CLI local
+
+---
+
+## Étape 7 — Quality Gates et Politique de Sécurité
+
+### Exercice 7.1 — Définir votre politique de Quality Gates
+
+**Tableau Quality Gates implémenté :**
+
+| Security Gate | Condition bloquante | Condition informative | Justification |
+|---------------|---------------------|----------------------|---------------|
+| **Gitleaks** | Tout secret détecté = BLOCK | N/A | Zéro tolérance secrets - risque immédiat de compromission |
+| **OWASP Dep-Check** | CVE CRITICAL (CVSS ≥ 9.0) = BLOCK | CVE HIGH (CVSS 7-8.9) = INFO | Les CVE CRITICAL nécessitent action immédiate, les HIGH peuvent être plannifiées |
+| **Semgrep SAST** | Finding ERROR = BLOCK | Finding WARNING = INFO | Les erreurs sont des vulnérabilités confirmées, les warnings nécessitent review |
+| **Trivy container** | CVE CRITICAL = BLOCK | CVE HIGH = INFO | Image de base vulnérable critique inacceptable en production |
+
+**Implémentation dans le workflow :**
+- Gitleaks : Pas de `continue-on-error` → bloque automatiquement
+- OWASP : `--failOnCVSS 9` → bloque sur CRITICAL uniquement
+- Semgrep : `--severity ERROR --error` → bloque sur ERROR
+- Trivy : `exit-code: 1` + `severity: CRITICAL` → bloque sur CRITICAL
+
+---
+
+### Exercice 7.2 — Job de synthèse Security Summary
+
+**PLACEHOLDER complété :**
+
+- **`if:`** → `${{ success() }}` (s'exécute seulement si tous les jobs précédents réussissent)
+
+**Implémentation :** [devsecops.yml](.github/workflows/devsecops.yml#L147-L162)
+
+Le job `security-summary` génère un tableau récapitulatif dans l'onglet Summary du workflow avec le statut de chaque security gate. Il utilise la variable `$GITHUB_STEP_SUMMARY` pour afficher du Markdown formaté directement dans l'interface GitHub Actions.
+
+**Exemple de sortie :**
+
+```
+## 🛡️ Security Scan Summary
+| Gate | Status | Details |
+|------|--------|---------|
+| 🔐 Secrets | ✅ Passed | No secrets detected |
+| 📦 SCA | ✅ Passed | 0 CVE CRITICAL |
+| 🔍 SAST | ✅ Passed | 1 finding (corrected) |
+| 🐳 Trivy | ✅ Passed | 0 CVE CRITICAL |
+```
 
 ---
