@@ -59,7 +59,7 @@ jobs:
         with:
           project: 'TP2-DevSecOps'
           path: '.'
-          format: 'HTML,JSON,SARIF'
+          format: 'ALL'
           out: 'reports'
           args: >-
             --failOnCVSS 7
