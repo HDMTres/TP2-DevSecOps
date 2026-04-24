@@ -518,23 +518,37 @@ Si j'implémentais Trivy en GitLab CI :
 
 **Question 20 : Mettez à jour l'image de base vers une version récente et minimale**
 
-RÉPONSE (avant correction - commit actuel) :
+RÉPONSE (avant correction - commit 3652dfb) :
 Image vulnérable : `node:18.0.0-alpine3.14` (avril 2022)
 
-Trivy détecte : (À compléter après premier scan)
-- CVE CRITICAL : ?
-- CVE HIGH : ?
-- CVE MEDIUM : ?
+Trivy détecte : ❌ **Pipeline bloqué avec exit code 1**
+- **CVE CRITICAL : 1** → CVE-2022-37434 (zlib 1.2.12-r0 - heap-based buffer overflow)
+- CVE HIGH : 0
+- CVE MEDIUM : 0
+- OS : Alpine 3.14.6 (version non supportée, plus de mises à jour de sécurité)
+
+⚠️ Warning Trivy : "This OS version is no longer supported by the distribution"
 
 **Question 21 : Ajoutez l'instruction USER nonroot**
 
 RÉPONSE :
-Dockerfile actuel : pas d'instruction USER → s'exécute en root (faille de sécurité)
+**Avant** (commit 3652dfb) : Pas d'instruction USER → conteneur s'exécute en root ❌
+
+**Après correction** :
+```dockerfile
+FROM node:20-alpine3.19
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+USER appuser
+```
+→ Conteneur s'exécute avec utilisateur non-privilégié ✅
 
 **Question 22 : Poussez la correction et vérifiez que le pipeline réussit**
 
 RÉPONSE :
-(À compléter après correction)
+Après mise à jour du Dockerfile vers `node:20-alpine3.19` + ajout USER appuser :
+- Build réussi ✅
+- Trivy scan : (À compléter après push)
+- Pipeline : (À compléter après push)
 
 **Question 23 : Comparez le nombre de CVE CRITICAL avant et après la correction**
 
@@ -542,10 +556,12 @@ RÉPONSE :
 
 | Métrique | Avant (node:18.0.0-alpine3.14) | Après (node:20-alpine3.19) |
 |----------|--------------------------------|----------------------------|
-| CVE CRITICAL | ? | ? |
-| CVE HIGH | ? | ? |
-| CVE MEDIUM | ? | ? |
+| CVE CRITICAL | **1** (CVE-2022-37434 zlib) | *(À compléter)* |
+| CVE HIGH | 0 | *(À compléter)* |
+| CVE MEDIUM | 0 | *(À compléter)* |
+| OS Support | ❌ Alpine 3.14.6 (EOL) | ✅ Alpine 3.19 (supporté) |
 | User root | ❌ Oui (danger) | ✅ Non (appuser) |
-| Pipeline | ❌ Échoué | ✅ Réussi |
+| Pipeline | ❌ Échoué (exit code 1) | *(À compléter)* |
+| Temps scan | ~10s | *(À compléter)* |
 
 ---

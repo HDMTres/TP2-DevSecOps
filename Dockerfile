@@ -1,16 +1,20 @@
-# Dockerfile de test (volontairement vulnérable pour l'exercice)
-# NE PAS utiliser en production !
-# Version ancienne intentionnelle = CVE CRITICAL attendues
-FROM node:18.0.0-alpine3.14
+# Dockerfile sécurisé - Version corrigée (Exercice 5.4)
+FROM node:20-alpine3.19
 
 WORKDIR /app
-COPY package*.json ./
+
+# Créer un utilisateur non-root
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
+# Copier les dépendances et installer
+COPY --chown=appuser:appgroup package*.json ./
 RUN npm install --only=production
-COPY . .
+
+# Copier le code applicatif
+COPY --chown=appuser:appgroup . .
+
+# Basculer vers utilisateur non-privilégié
+USER appuser
+
 EXPOSE 3000
 CMD ["node", "src/index.js"]
-
-# À corriger dans l'exercice 5.4 :
-# FROM node:20-alpine3.19
-# RUN adduser --no-create-home appuser
-# USER appuser
