@@ -15,18 +15,28 @@ permissions:
 
 jobs:
   secrets-scan:
-    name: "🔐 Secrets Scan — Gitleaks"
+    name: "🔐 Secrets Scanning (Gitleaks)"
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout code (full history)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: TODO Étape 2 — Gitleaks
-        run: |
-          echo "Ajoute ici Gitleaks à l'étape 2"
-          exit 0
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          config-path: .gitleaks.toml
+
+      - name: Upload Gitleaks report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gitleaks-report
+          path: gitleaks-report.json
+          retention-days: 30
 
   dependency-scan:
     name: "📦 Dependency Scan — OWASP Dependency-Check"

@@ -108,4 +108,33 @@ Et pour les variables :
 - `DS_EXCLUDED_PATHS: .git,node_modules,dist,build,target,coverage`
 
 ⚠️ Remarque : dans **le projet**, je n’implémente que GitHub Actions.
+---
 
+## Étape 2 — Security Gate 1 : Secrets Scanning avec Gitleaks
+
+### Exercice 2.1 — Configurer Gitleaks dans GitHub Actions
+
+**Réponse (élève) — PLACEHOLDER complétés**
+
+J'ai implémenté le job `secrets-scan` avec les valeurs suivantes :
+
+- **`fetch-depth: 0`**  
+  → Indispensable car Gitleaks analyse **tout l'historique Git**, pas seulement le dernier commit. Si on mettait `fetch-depth: 1`, les secrets dans les anciens commits ne seraient pas détectés.
+
+- **`config-path: .gitleaks.toml`**  
+  → Chemin vers le fichier de configuration Gitleaks du TP1 (à la racine du projet).
+
+- **`if: always()`**  
+  → Le rapport doit être uploadé **même si le job échoue** (quand un secret est détecté). Sinon on perd le rapport détaillé.
+
+- **`path: gitleaks-report.json`**  
+  → Nom par défaut du rapport généré par `gitleaks-action@v2`.
+
+- **`retention-days: 30`**  
+  → Conservation du rapport pendant 30 jours (suffisant pour analyse).
+
+**Comportement attendu :**
+- Si Gitleaks détecte un secret → exit code non-nul → job échoue → pipeline bloqué ✅
+- Le rapport JSON est uploadé dans les artefacts GitHub pour analyse.
+
+Implémentation : [devsecops.yml](.github/workflows/devsecops.yml#L16-L32)
