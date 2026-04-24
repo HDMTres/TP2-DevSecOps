@@ -1,0 +1,13 @@
+{
+  "name": "tp2-devsecops",
+  "version": "1.0.0",
+  "description": "TP2 DevSecOps - Pipeline CI/CD avec GitHub Actions",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "keywords": ["devsecops", "security", "cicd"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {}
+}

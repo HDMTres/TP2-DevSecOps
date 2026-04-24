@@ -1,0 +1,7 @@
+rules:
+  - id: detect-sql-concat
+    message: "Éviter la concaténation SQL. Utiliser des requêtes paramétrées."
+    severity: ERROR
+    languages: [javascript, typescript]
+    patterns:
+      - pattern: $DB.query("..." + $X)

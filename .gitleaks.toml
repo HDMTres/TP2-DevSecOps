@@ -1,0 +1,7 @@
+title = "TP2 DevSecOps Gitleaks config"
+
+[allowlist]
+description = "Allowlist basique d'exemple"
+paths = [
+  '''^TP2_DevSecOps_Pipeline_CICD\.pdf$'''
+]

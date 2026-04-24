@@ -1,0 +1,10 @@
+name: Deprecated - use devsecops.yml
+
+on:
+  workflow_dispatch:
+
+jobs:
+  notice:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Ce workflow est obsolète. Utilisez .github/workflows/devsecops.yml"
