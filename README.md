@@ -429,3 +429,123 @@ Raisons :
 → Dependency-Check = SCA avec dépendances réseau (BD de vulnérabilités)
 
 ---
+
+## Étape 5 — Security Gate 4 : Scan d'image Docker avec Trivy
+
+### Exercice 5.1 — Créer un Dockerfile de test volontairement vulnérable
+
+**Réponse (élève)**
+
+Dockerfile créé : [Dockerfile](Dockerfile)
+
+```dockerfile
+FROM node:18.0.0-alpine3.14  # Version ancienne avec CVE CRITICAL
+
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production
+COPY . .
+EXPOSE 3000
+CMD ["node", "src/index.js"]
+```
+
+**Vulnérabilités intentionnelles** :
+1. Image de base obsolète `node:18.0.0-alpine3.14` (avril 2022) → CVE CRITICAL attendues
+2. Pas d'instruction `USER` → conteneur s'exécute en root (mauvaise pratique)
+3. Alpine 3.14 ancien → vulnérabilités dans les packages système
+
+---
+
+### Exercice 5.2 — Configurer Trivy dans GitHub Actions
+
+**Réponse (élève) — PLACEHOLDER complétés**
+
+- **`docker build -t`**  
+  → `tp2-devsecops:${{ github.sha }}` (tag avec hash du commit pour traçabilité)
+
+- **`image-ref:` (scan)**  
+  → `tp2-devsecops:${{ github.sha }}` (référence de l'image buildée)
+
+- **`format:` (table)**  
+  → `table` (affichage lisible dans les logs du job)
+
+- **`exit-code:`**  
+  → `1` (mode bloquant : job échoue si CVE détectées)  
+  💡 Utiliser `0` pour mode informatif (ne bloque pas le pipeline)
+
+- **`severity:` (table)**  
+  → `CRITICAL` (bloquer uniquement sur CVE critiques)  
+  💡 En production : `CRITICAL,HIGH` recommandé
+
+- **`ignore-unfixed:`**  
+  → `false` (afficher toutes les CVE, même sans patch)  
+  💡 En production : `true` pour ignorer les CVE non patchables
+
+- **`severity:` (SARIF)**  
+  → `CRITICAL,HIGH` (remonter CRITICAL + HIGH dans GitHub Security tab)
+
+**Comportement attendu :**
+- Trivy scanne l'image Docker buildée
+- Détecte les CVE dans l'OS (Alpine) et les packages (Node.js)
+- 1ère exécution (table) : affiche les résultats + bloque si CRITICAL
+- 2ème exécution (SARIF) : génère le fichier pour GitHub Security
+- Upload SARIF créé des alertes dans l'onglet Security
+
+Implémentation : [devsecops.yml](.github/workflows/devsecops.yml#L110-L145)
+
+---
+
+### Exercice 5.3 — Variante GitLab CI (réponse théorique)
+
+**Réponse (élève)**
+
+Si j'implémentais Trivy en GitLab CI :
+
+- **`--exit-code`**  
+  → `1` (job échoue si CVE détectées)
+
+- **`--severity`**  
+  → `CRITICAL,HIGH` (détecter CRITICAL et HIGH)
+
+- **`--format`**  
+  → `json` (format compatible avec GitLab Container Scanning report)
+
+⚠️ Dans mon projet, je n'implémente que GitHub Actions.
+
+---
+
+### Exercice 5.4 — Corriger l'image Docker pour passer le gate
+
+**Question 20 : Mettez à jour l'image de base vers une version récente et minimale**
+
+RÉPONSE (avant correction - commit actuel) :
+Image vulnérable : `node:18.0.0-alpine3.14` (avril 2022)
+
+Trivy détecte : (À compléter après premier scan)
+- CVE CRITICAL : ?
+- CVE HIGH : ?
+- CVE MEDIUM : ?
+
+**Question 21 : Ajoutez l'instruction USER nonroot**
+
+RÉPONSE :
+Dockerfile actuel : pas d'instruction USER → s'exécute en root (faille de sécurité)
+
+**Question 22 : Poussez la correction et vérifiez que le pipeline réussit**
+
+RÉPONSE :
+(À compléter après correction)
+
+**Question 23 : Comparez le nombre de CVE CRITICAL avant et après la correction**
+
+RÉPONSE :
+
+| Métrique | Avant (node:18.0.0-alpine3.14) | Après (node:20-alpine3.19) |
+|----------|--------------------------------|----------------------------|
+| CVE CRITICAL | ? | ? |
+| CVE HIGH | ? | ? |
+| CVE MEDIUM | ? | ? |
+| User root | ❌ Oui (danger) | ✅ Non (appuser) |
+| Pipeline | ❌ Échoué | ✅ Réussi |
+
+---
