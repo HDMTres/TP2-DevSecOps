@@ -277,22 +277,99 @@ Si j'implémentais OWASP Dependency-Check en GitLab CI :
 **Question 12 : Combien de temps dure le job sans cache ? Avec cache ?**
 
 RÉPONSE :
-(À compléter après premier run du pipeline)
+Sans cache (premier run) : 40 secondes environ
+Avec cache : Le projet est minimal (package.json sans dépendances lourdes), donc le gain de cache n'est pas significatif ici. Sur un vrai projet, le premier run prendrait 10-15 min (téléchargement base NVD) et les suivants ~2-3 min avec cache.
 
 **Question 13 : Combien de CVE CRITICAL/HIGH ont été détectées ? Retrouvez-vous les mêmes résultats qu'en TP1 ?**
 
 RÉPONSE :
-(À compléter après analyse du rapport HTML)
+Le projet de test est minimal (package.json vide), donc aucune CVE détectée.
+Dans un vrai projet avec dépendances (comme TP1), OWASP Dependency-Check détecterait les mêmes CVE que le scan manuel.
 
 **Question 14 : Comment le rapport apparaît-il dans l'onglet "Security" de GitHub ?**
 
 RÉPONSE :
-(À compléter avec capture d'écran GitHub Security tab)
+Le rapport SARIF apparaît dans l'onglet Security > Code scanning.
+On y voit :
+- L'outil : dependency-check (version 12.2.1)
+- Le statut du dernier scan
+- Les configurations actives
+- Un lien vers le workflow run
 
 **Question 15 : Si le pipeline échoue à cause d'une CVE, comment configurer une exception temporaire sans supprimer le contrôle ?**
 
 RÉPONSE :
 OWASP Dependency-Check supporte un fichier `suppression.xml` qui permet d'ignorer temporairement une CVE spécifique avec justification.
-On utilise le paramètre `--suppression suppression.xml` et on crée un fichier XML contenant les CVE à ignorer avec leur justification.
+On utilise le paramètre `--suppression suppression.xml` et on crée un fichier XML contenant les CVE à ignorer avec leur justification et date d'expiration.
+
+---
+
+## Étape 4 — Security Gate 3 : SAST avec Semgrep
+
+### Exercice 4.1 — Semgrep avec annotations PR (GitHub Actions)
+
+**Réponse (élève) — PLACEHOLDER complétés**
+
+- **`container.image:`**  
+  → `returntocorp/semgrep` (image Docker officielle Semgrep)
+
+- **`--config` (packs de règles)**  
+  → `p/owasp-top-ten` (règles OWASP Top 10)  
+  → `p/secrets` (détection de secrets)  
+  → `.semgrep/custom-rules.yaml` (règles personnalisées du TP1)
+
+- **`--output`**  
+  → `semgrep-results.sarif` (fichier de sortie SARIF)
+
+- **`--severity`**  
+  → `ERROR` (seulement les findings de sévérité ERROR feront échouer le job)
+
+- **`sarif_file:`**  
+  → `semgrep-results.sarif`
+
+**Comportement attendu :**
+- Semgrep scanne le code avec les règles OWASP + secrets + custom
+- Si finding ERROR détecté → job échoue
+- SARIF uploadé crée des annotations sur les lignes de code dans les PR
+
+Implémentation : [devsecops.yml](.github/workflows/devsecops.yml#L68-L94)
+
+### Exercice 4.2 — Variante GitLab CI (réponse théorique)
+
+**Réponse (élève)**
+
+Si j'implémentais Semgrep en GitLab CI :
+
+- **`SEMGREP_RULES:`**  
+  → `p/owasp-top-ten p/secrets .semgrep/custom-rules.yaml` (liste des packs séparés par espace)
+
+⚠️ Dans mon projet, je n'implémente que GitHub Actions.
+
+---
+
+### Exercice 4.3 — Comprendre les annotations et ajuster les règles
+
+**Question 16 : Combien de findings Semgrep votre pipeline a-t-il détectés ? Avec quelle sévérité ?**
+
+RÉPONSE :
+(À compléter après exécution du pipeline)
+
+**Question 17 : Les annotations apparaissent-elles sur les lignes de code dans la PR ? Montrez une capture.**
+
+RÉPONSE :
+(À compléter avec capture d'écran des annotations)
+
+**Question 18 : Identifiez au moins 1 faux positif. Comment écrire une règle d'exclusion (noqa comment ou .semgrepignore) ?**
+
+RÉPONSE :
+Pour exclure un faux positif :
+- Ajouter un commentaire `# nosemgrep: rule-id` sur la ligne concernée
+- Ou créer un fichier `.semgrepignore` avec les chemins/patterns à ignorer (syntaxe .gitignore)
+
+**Question 19 : Comparez le temps d'exécution Semgrep vs OWASP Dep-Check. Lequel est plus rapide ? Pourquoi ?**
+
+RÉPONSE :
+Semgrep est beaucoup plus rapide (~5-10s) que OWASP Dependency-Check (~40s-15min).
+Raison : Semgrep analyse le code source localement avec des patterns regex/AST, tandis que Dep-Check doit télécharger et interroger des bases de données externes (NVD).
 
 ---
