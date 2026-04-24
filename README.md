@@ -378,24 +378,40 @@ Le SARIF a bien été uploadé vers GitHub Security tab (catégorie: semgrep-sas
 **Question 18 : Identifiez au moins 1 faux positif. Comment écrire une règle d'exclusion (noqa comment ou .semgrepignore) ?**
 
 RÉPONSE :
-Aucun faux positif détecté (0 findings). Mais voici comment gérer les faux positifs :
+Dans ce TP, tous les findings sont des **vrais positifs** (vulnérabilités réelles dans app.js).
 
-**Méthode 1 - Commentaire inline** :
+**Exemple de faux positif courant** : Un test unitaire qui utilise intentionnellement `eval()` pour tester la sécurité.
+
+**3 méthodes pour exclure un faux positif** :
+
+**Méthode 1 - Commentaire inline nosemgrep** :
 ```javascript
-const password = "admin"; // nosemgrep: hardcoded-admin-password
+const result = eval(testCode); // nosemgrep: dangerous-eval-usage
 ```
+→ Désactive la règle uniquement pour cette ligne
 
-**Méthode 2 - .semgrepignore** (déjà créé) :
+**Méthode 2 - Fichier .semgrepignore** (déjà créé dans ce projet) :
 ```
 node_modules/
 .git/
-Dockerfile
-package*.json
+test/fixtures/
+*.test.js
 ```
-Syntaxe identique à .gitignore (patterns glob).
+→ Ignore des fichiers/répertoires entiers (syntaxe .gitignore)
 
-**Méthode 3 - Configuration dans la règle** :
-Ajouter `paths.exclude` dans la règle YAML pour ignorer certains chemins.
+**Méthode 3 - Configuration paths.exclude dans la règle** :
+```yaml
+rules:
+  - id: dangerous-eval-usage
+    pattern: eval($INPUT)
+    paths:
+      exclude:
+        - "test/**"
+        - "**/*.test.js"
+```
+→ Exclut certains chemins directement dans la définition de la règle
+
+💡 Préférer **nosemgrep** pour exceptions ponctuelles et justifiées.
 
 **Question 19 : Comparez le temps d'exécution Semgrep vs OWASP Dep-Check. Lequel est plus rapide ? Pourquoi ?**
 
