@@ -1,5 +1,5 @@
-# Dockerfile sécurisé - Version corrigée (Exercice 5.4)
-FROM node:20-alpine3.19
+# Dockerfile VOLONTAIREMENT VULNÉRABLE pour Étape 8
+FROM node:18.0.0-alpine3.14
 
 WORKDIR /app
 

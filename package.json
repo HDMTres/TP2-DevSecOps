@@ -9,5 +9,7 @@
   "keywords": ["devsecops", "security", "cicd"],
   "author": "",
   "license": "ISC",
-  "dependencies": {}
+  "dependencies": {
+    "lodash": "4.17.4"
+  }
 }
