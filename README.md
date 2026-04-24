@@ -197,3 +197,102 @@ Quand le secret est détecté (ou bloqué par GitHub Push Protection), les jobs 
 C'est le principe fail-fast : on économise du temps de CI en bloquant immédiatement.
 
 ---
+
+## Étape 3 — Security Gate 2 : SCA avec OWASP Dependency-Check
+
+### Exercice 3.1 — Configurer OWASP Dep-Check avec cache NVD
+
+**Réponse (élève) — PLACEHOLDER complétés**
+
+- **`path:` (cache)**  
+  → `~/.m2/repository/org/owasp/dependency-check-data/` (répertoire où Dep-Check stocke la base NVD)
+
+- **`key:` (cache)**  
+  → `${{ runner.os }}-dep-check-${{ hashFiles('**/package-lock.json', '**/package.json') }}` (clé basée sur l'OS et le hash des fichiers de dépendances)
+
+- **`restore-keys:`**  
+  → `${{ runner.os }}-dep-check-` (restaure le cache même si le hash a changé)
+
+- **`project:`**  
+  → `TP2-DevSecOps` (nom du projet)
+
+- **`path:` (scan)**  
+  → `.` (scanner tout le projet)
+
+- **`format:`**  
+  → `HTML,JSON,SARIF` (plusieurs formats pour analyse et upload GitHub Security)
+
+- **`out:`**  
+  → `reports` (répertoire de sortie des rapports)
+
+- **`--failOnCVSS`**  
+  → `7` (échec si CVE avec CVSS ≥ 7.0 = HIGH ou CRITICAL)
+
+- **`if:` (upload SARIF)**  
+  → `always()` (upload même si le job échoue)
+
+- **`sarif_file:`**  
+  → `reports/dependency-check-report.sarif`
+
+**Comportement attendu :**
+- Premier run : télécharge la base NVD (~10-15 min)
+- Runs suivants avec cache : ~2-3 min
+- Si CVE CVSS ≥ 7 détectée → job échoue → pipeline bloqué
+
+Implémentation : [devsecops.yml](.github/workflows/devsecops.yml#L34-L66)
+
+### Exercice 3.2 — Variante GitLab CI (réponse théorique)
+
+**Réponse (élève)**
+
+Si j'implémentais OWASP Dependency-Check en GitLab CI :
+
+- **`cache.paths:`**  
+  → `/root/.m2/repository/org/owasp/dependency-check-data/`
+
+- **`--scan`**  
+  → `.` (répertoire à scanner)
+
+- **`--format`**  
+  → `JSON,HTML` (formats de rapport)
+
+- **`--out`**  
+  → `reports` (répertoire de sortie)
+
+- **`--failOnCVSS`**  
+  → `7` (seuil de blocage)
+
+- **`artifacts.paths:`**  
+  → `reports/*`
+
+- **`reports.dependency_scanning:`**  
+  → `reports/dependency-check-report.json`
+
+⚠️ Dans mon projet, je n'implémente que GitHub Actions.
+
+---
+
+### Exercice 3.3 — Analyser les résultats
+
+**Question 12 : Combien de temps dure le job sans cache ? Avec cache ?**
+
+RÉPONSE :
+(À compléter après premier run du pipeline)
+
+**Question 13 : Combien de CVE CRITICAL/HIGH ont été détectées ? Retrouvez-vous les mêmes résultats qu'en TP1 ?**
+
+RÉPONSE :
+(À compléter après analyse du rapport HTML)
+
+**Question 14 : Comment le rapport apparaît-il dans l'onglet "Security" de GitHub ?**
+
+RÉPONSE :
+(À compléter avec capture d'écran GitHub Security tab)
+
+**Question 15 : Si le pipeline échoue à cause d'une CVE, comment configurer une exception temporaire sans supprimer le contrôle ?**
+
+RÉPONSE :
+OWASP Dependency-Check supporte un fichier `suppression.xml` qui permet d'ignorer temporairement une CVE spécifique avec justification.
+On utilise le paramètre `--suppression suppression.xml` et on crée un fichier XML contenant les CVE à ignorer avec leur justification.
+
+---

@@ -39,17 +39,45 @@ jobs:
           retention-days: 30
 
   dependency-scan:
-    name: "📦 Dependency Scan — OWASP Dependency-Check"
+    name: "📦 SCA — OWASP Dependency-Check"
     runs-on: ubuntu-latest
     needs: [secrets-scan]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: TODO Étape 3 — OWASP Dependency-Check
-        run: |
-          echo "Ajoute ici OWASP Dependency-Check à l'étape 3"
-          exit 0
+      - name: Cache NVD database
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/org/owasp/dependency-check-data/
+          key: ${{ runner.os }}-dep-check-${{ hashFiles('**/package-lock.json', '**/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-dep-check-
+
+      - name: Run OWASP Dependency-Check
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: 'TP2-DevSecOps'
+          path: '.'
+          format: 'HTML,JSON,SARIF'
+          out: 'reports'
+          args: >-
+            --failOnCVSS 7
+            --enableRetired
+
+      - name: Upload Dependency-Check reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dependency-check-reports
+          path: reports/
+          retention-days: 30
+
+      - name: Upload SARIF to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: reports/dependency-check-report.sarif
 
   sast:
     name: "🔍 SAST — Semgrep"
