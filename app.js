@@ -6,10 +6,10 @@ const app = express();
 // FIX: Utiliser variable d'environnement au lieu de hardcoded password
 const adminPassword = process.env.ADMIN_PASSWORD || "change-me";
 
-// VULNÉRABILITÉ: SQL Injection par concaténation
+// FIX: Utiliser requêtes paramétrées pour éviter SQL injection
 function getUser(userId) {
-  const query = "SELECT * FROM users WHERE id = '" + userId + "'";
-  return db.query(query);
+  const query = "SELECT * FROM users WHERE id = ?";
+  return db.query(query, [userId]);
 }
 
 // FIX: Utiliser variable d'environnement pour les secrets
