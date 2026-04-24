@@ -3,27 +3,28 @@
 const express = require('express');
 const app = express();
 
-// Vulnérabilité 1: Hardcoded admin password (détecté par règle custom)
-const adminPassword = "admin";
+// FIX: Utiliser variable d'environnement au lieu de hardcoded password
+const adminPassword = process.env.ADMIN_PASSWORD || "change-me";
 
-// Vulnérabilité 2: SQL Injection risk
+// FIX: Utiliser requêtes paramétrées pour éviter SQL injection
 function getUser(userId) {
-  const query = "SELECT * FROM users WHERE id = " + userId + ";";
-  return db.query(query);
+  const query = "SELECT * FROM users WHERE id = ?";
+  return db.query(query, [userId]);
 }
 
-// Vulnérabilité 3: Hardcoded secret (détecté par p/secrets)
-const apiKey = "sk_test_FAKE_KEY_FOR_DEMO_PURPOSES";
+// FIX: Utiliser variable d'environnement pour les secrets
+const apiKey = process.env.STRIPE_API_KEY;
 
-// Vulnérabilité 4: Eval usage (détecté par p/owasp-top-ten)
+// FIX: Ne jamais utiliser eval() - utiliser JSON.parse() ou alternatives sécurisées
 function processInput(userCode) {
-  return eval(userCode);
+  // return eval(userCode); // DANGER - commenté
+  return JSON.parse(userCode); // Alternative sécurisée pour JSON
 }
 
-// Vulnérabilité 5: Missing rate limiting (détecté par p/owasp-top-ten)
+// Vulnérabilité 5: Missing rate limiting (reste à corriger)
 app.post('/api/login', (req, res) => {
   const { username, password } = req.body;
-  // No rate limiting or brute force protection
+  // TODO: Ajouter rate limiting avec express-rate-limit
   if (username === 'admin' && password === adminPassword) {
     res.json({ token: generateToken() });
   }
