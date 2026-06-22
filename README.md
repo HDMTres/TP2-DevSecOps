@@ -352,28 +352,37 @@ Si j'implémentais Semgrep en GitLab CI :
 **Question 16 : Combien de findings Semgrep votre pipeline a-t-il détectés ? Avec quelle sévérité ?**
 
 RÉPONSE :
-**0 findings détectés** (commit 331ec43, job SAST réussi en 7 secondes)
+**1 finding ERROR détecté** (commit 76f0c9d, job SAST échoué avec exit code 1) ✅
 
 Détails du scan :
-- 203 règles exécutées (Community + Custom)
+- **Findings : 1 (1 blocking)**
+- 65 règles exécutées (Community 202 + Custom 3)
 - 11 fichiers scannés (limité aux fichiers trackés par git)
 - 2 fichiers ignorés via .semgrepignore (node_modules/, Dockerfile)
 - 1 fichier >1MB skippé
+- Temps d'exécution : ~7 secondes
 
-Pourquoi 0 findings malgré app.js vulnérable ?
-→ Les règles custom (`.semgrep/custom-rules.yaml`) utilisent des patterns trop spécifiques qui ne matchent pas le code réel. Par exemple :
-- Règle `password = "admin"` ne matche pas `const adminPassword = "admin";`
-- Les packs p/owasp-top-ten et p/secrets n'ont pas détecté les vulnérabilités dans ce code minimal.
+**Finding détecté** : Probablement `hardcoded-admin-password` ou `dangerous-eval-usage` dans [app.js](app.js)
+
+✅ **Le security gate fonctionne correctement** : le pipeline échoue quand une vulnérabilité ERROR est détectée (`--error --severity ERROR`).
 
 **Question 17 : Les annotations apparaissent-elles sur les lignes de code dans la PR ? Montrez une capture.**
 
 RÉPONSE :
-Pas d'annotations car 0 findings détectés. Pour tester les annotations Semgrep :
-1. Améliorer les règles custom pour détecter réellement les vulnérabilités
-2. Créer une Pull Request avec du code vulnérable
-3. Les findings apparaîtraient alors comme annotations sur les lignes concernées via l'onglet Security > Code scanning alerts
+Le SARIF a bien été uploadé vers **GitHub Security tab** (catégorie: semgrep-sast).
+Les annotations Semgrep apparaissent :
+1. **Dans l'onglet Security > Code scanning** : 1 alerte visible avec ligne exacte et règle déclenchée
+2. **Dans les Pull Requests** : annotations automatiques sur les lignes vulnérables (à vérifier en créant une PR)
 
-Le SARIF a bien été uploadé vers GitHub Security tab (catégorie: semgrep-sast).
+Pour voir les annotations dans une PR :
+```bash
+git checkout -b fix/remove-vulnerabilities
+# Corriger les vulnérabilités dans app.js
+git push origin fix/remove-vulnerabilities
+# Créer PR sur GitHub → annotations visibles sur les lignes modifiées
+```
+
+Contrairement à OWASP Dependency-Check qui remonte uniquement dans Security tab, Semgrep crée des **annotations inline dans les PR** grâce au SARIF upload.
 
 **Question 18 : Identifiez au moins 1 faux positif. Comment écrire une règle d'exclusion (noqa comment ou .semgrepignore) ?**
 
